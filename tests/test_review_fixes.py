@@ -40,9 +40,8 @@ def test_a1_home_endpoint_does_not_leak_risk_or_median():
 
 def test_a2_dark_pill_tokens_and_a3_course_wrapping():
     css = (ROOT / 'web/style.css').read_text()
-    assert ':root[data-theme="dark"] .badge' in css
-    assert 'background:color-mix(in srgb, var(--c) 14%, #172337)' in css
-    assert ':root[data-theme="dark"] .badge::after {display:none;}' in css
+    assert '--help:#ffabb4;--help-bg:#422a31' in css
+    assert '.badge{background:var(--cb);color:var(--c);' in css
     assert 'course-meta' in css and 'overflow-wrap:anywhere' in css
 
 
