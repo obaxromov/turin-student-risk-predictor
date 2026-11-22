@@ -27,16 +27,10 @@ const L = {
   login_welcome: ["Welcome back", "С возвращением", "Xush kelibsiz"],
   login_help: ["Sign in to open your learning workspace.", "Войдите, чтобы открыть учебную панель.", "Taʼlim boshqaruv paneliga kirish uchun tizimga kiring."],
   demo_access: ["Or explore the demo", "Или откройте демоверсию", "Yoki demoni sinab koʻring"],
-  stat_caption: ["Current cohort", "Текущая группа", "Joriy guruh"],
-  stat_needs: ["Students needing support", "Нуждаются в поддержке", "Yordamga muhtoj talabalar"],
-  stat_activity: ["Activity change", "Изменение активности", "Faollikdagi oʻzgarish"],
   distribution: ["Cohort at a glance", "Распределение группы", "Guruh holati"],
-  distribution_note: ["A quick view of where support may be useful.", "Краткий обзор возможных точек поддержки.", "Yordam kerak boʻlishi mumkin boʻlgan holatlarning qisqa koʻrinishi."],
-  priority_label: ["PRIORITY VIEW", "ПРИОРИТЕТЫ", "USTUVOR VAZIFALAR"],
   activity_label: ["RECENT ACTIVITY", "НЕДАВНЯЯ АКТИВНОСТЬ", "SOʻNGGI FAOLLIK"],
   privacy_note: ["Academic prototype · Not for real student records", "Учебный прототип · Не для реальных данных студентов", "Oʻquv prototipi · Haqiqiy talaba maʼlumotlari uchun emas"],
   profile: ["Account settings", "Настройки аккаунта", "Hisob sozlamalari"],
-  status_ok: ["On-track students", "Студенты по плану", "Reja boʻyicha oʻqiyotganlar"],
   search_student: ["Find a student ID", "Найти по ID студента", "Talaba ID sini izlash"],
   no_matches: ["No students match your search.", "Нет студентов по вашему запросу.", "Qidiruvga mos talabalar topilmadi."],
   recent_four: ["Last 4 weeks", "Последние 4 недели", "Soʻnggi 4 hafta"],
@@ -47,10 +41,12 @@ const L = {
   demo_preview: ["A thoughtful space for better decisions", "Продуманное пространство для важных решений", "Yaxshi qarorlar uchun qulay muhit"],
   live_system: ["Your learning workspace", "Ваша учебная панель", "Sizning taʼlim ish joyingiz"],
   mainNav: ["Main navigation", "Основная навигация", "Asosiy navigatsiya"],
+  priorityHint: ["Open a profile to review the signals and plan a follow-up.", "Откройте профиль, чтобы изучить показатели и спланировать дальнейшие действия.", "Koʻrsatkichlarni koʻrish va keyingi qadamni rejalashtirish uchun profilni oching."],
+  prioritySearch: ["Search this list", "Поиск в этом списке", "Shu roʻyxatdan qidirish"],
 
 };
 
-const S = { lang: "en", i18n: {}, cfg: { demo_mode: false }, token: null, user: null, menuOpen: false, overviewCache: null, overviewCachedAt: 0, trendRange: "all", predictionDrafts: new Map() };
+const S = { lang: "en", i18n: {}, cfg: { demo_mode: false }, token: null, user: null, menuOpen: false, overviewCache: null, overviewCachedAt: 0, trendRange: "all", predictionDrafts: new Map(), studentDirectory: null };
 
 try { const l = localStorage.getItem("lang"); if (l in LANGS) S.lang = l; } catch (e) { /* storage blocked */ }
 try { S.token = sessionStorage.getItem("token"); } catch (e) { /* storage blocked: sign-in lasts until reload */ }
@@ -123,6 +119,7 @@ function startSession(d) {
 function endSession() {
   S.token = null; S.user = null; S.menuOpen = false; S.overviewCache = null; S.overviewCachedAt = 0;
   S.predictionDrafts.clear();
+  S.studentDirectory = null;
   try { sessionStorage.removeItem("token"); } catch (e) { /* ignore */ }
 }
 
@@ -272,34 +269,25 @@ function errorBox(e, retry) {
 }
 
 /* ---------- overview ---------- */
-function tierBar(cnt) {
-  const total = (cnt.help + cnt.watch + cnt.ok) || 1;
-  const bar = h("div", { class: "tierbar", role: "img", "aria-label": ["help", "watch", "ok"].map(k => t("tier_" + k) + " " + cnt[k]).join(", ") });
-  for (const k of ["help", "watch", "ok"]) { const seg = h("i", { class: "t-" + k }); seg.style.width = (cnt[k] / total * 100) + "%"; bar.append(seg); }
-  const legend = h("div", { class: "legend" }, ["help", "watch", "ok"].map(k => h("span", { class: "t-" + k }, h("span", { class: "dot" }), t("tier_" + k) + " ", h("b", null, cnt[k]))));
-  return h("div", null, bar, legend);
-}
-function urgentTable(d, rows = d.urgent) {
+function priorityList(d, rows = d.urgent) {
   if (!rows.length) return h("p", { class: "muted no-results" }, d.urgent.length ? t("no_matches") : t("none_now"));
-  return h("div", { class: "tablewrap" }, h("table", { class: "tbl" },
-    h("thead", null, h("tr", null, ["col_student", "col_tier", "col_risk", "col_reason"].map(k => h("th", { scope: "col" }, t(k))))),
-    h("tbody", null, rows.map(r => {
-      const fill = h("i"); fill.style.width = r.risk + "%";
-      return h("tr", null,
-        h("td", { class: "id" }, r.student_id), h("td", null, badge(r.tier)),
-        h("td", null, h("div", { class: "risk t-" + r.tier }, h("div", { class: "bar" }, fill), h("span", null, r.risk + "%"))),
-        h("td", null, reasonText(r.reason)));
-    }))));
+  return h("ul", { class: "priority-list" }, rows.map(r => h("li", null,
+    h("a", { class: "priority-student", href: "#/student/" + encodeURIComponent(r.student_id) },
+      h("span", { class: "priority-identity" }, h("strong", null, r.student_id),
+        h("span", { class: "muted priority-reason" }, reasonText(r.reason))),
+      h("span", { class: "priority-state" }, badge(r.tier),
+        h("span", { class: "priority-score" }, r.risk + "%", h("small", { class: "muted" }, t("col_risk")))),
+      h("span", { class: "priority-arrow", "aria-hidden": "true" }, icon("arrow"))))));
 }
 function urgentPanel(d) {
-  const results = h("div", { class: "priority-results" }, urgentTable(d));
+  const results = h("div", { class: "priority-results" }, priorityList(d));
   const search = h("input", { class: "student-search", type: "search", maxlength: 40,
-    autocomplete: "off", "aria-label": t("search_student"), placeholder: t("search_student"),
+    autocomplete: "off", "aria-label": t("prioritySearch"), placeholder: t("prioritySearch"),
     oninput: () => { const query = search.value.trim().toLowerCase();
-      results.replaceChildren(urgentTable(d, d.urgent.filter(r => r.student_id.toLowerCase().includes(query)))); } });
+      results.replaceChildren(priorityList(d, d.urgent.filter(r => r.student_id.toLowerCase().includes(query)))); } });
   return h("section", { class: "card priority-card" },
     h("div", { class: "section-head priority-head" },
-      h("div", null, h("p", { class: "eyebrow" }, t("priority_label")), h("h2", null, t("urgent_title"))),
+      h("div", null, h("h2", null, t("urgent_title")), h("p", { class: "muted small" }, t("priorityHint"))),
       h("div", { class: "search-shell" }, icon("search"), search)), results);
 }
 function activityMatrix(d) {
@@ -374,23 +362,22 @@ function trendPanel(d) {
         controls.querySelectorAll("button").forEach((b, idx) => b.setAttribute("aria-pressed", String(["four", "all"][idx] === k)));
       } }, t(k === "four" ? "recent_four" : "all_weeks"))));
   return h("section", { class: "card trend-card" },
-    h("div", { class: "section-head" }, h("div", null, h("h2", null, t("trend_chart_title"))), controls), chart);
+    h("div", { class: "section-head" }, h("div", null, h("h2", null, t("trend_chart_title")),
+      h("p", { class: "muted small trend-overview" }, t("stat_trend"), " ", h("strong", null, trendText(d.trend)))), controls), chart);
 }
-function donut(d) {
-  const R = 52, C = 2 * Math.PI * R, total = (d.counts.help + d.counts.watch + d.counts.ok) || 1;
-  const g = svg("svg", { class: "donut", width: 150, height: 150, viewBox: "0 0 150 150", role: "img", "aria-label": t("comp_title") });
-  g.append(svg("circle", { cx: 75, cy: 75, r: R, fill: "none", stroke: "var(--surface-2)", "stroke-width": 16 }));
-  let off = 0;
-  for (const k of ["help", "watch", "ok"]) {
-    const len = d.counts[k] / total * C; if (!len) continue;
-    g.append(svg("circle", { class: "ring r-" + k, cx: 75, cy: 75, r: R, "stroke-dasharray": `${len} ${C - len}`, "stroke-dashoffset": -off, transform: "rotate(-90 75 75)" }));
-    off += len;
+function cohortSummary(d) {
+  const tiers = ["help", "watch", "ok"];
+  const bar = h("div", { class: "tierbar cohort-bar", "aria-hidden": "true" });
+  for (const tier of tiers) {
+    const part = h("i", { class: "t-" + tier });
+    part.style.width = (d.counts[tier] / (d.students || 1) * 100) + "%";
+    bar.append(part);
   }
-  g.append(svg("text", { x: 75, y: 80, "text-anchor": "middle", "font-size": 26 }, total), svg("text", { x: 75, y: 98, "text-anchor": "middle", "font-size": 11, class: "u" }, t("students_unit")));
-  return h("div", null, h("h2", null, t("comp_title")), h("div", { class: "donut-wrap" }, g, tierBarLegend(d.counts)));
-}
-function tierBarLegend(cnt) {
-  return h("div", { class: "legend" }, ["help", "watch", "ok"].map(k => h("span", { class: "t-" + k }, h("span", { class: "dot" }), t("tier_" + k) + " ", h("b", null, cnt[k]))));
+  return h("section", { class: "card overview-cohort" }, sectionHead(t("distribution")),
+    bar, h("ul", { class: "cohort-status-list" }, tiers.map(tier => h("li", null,
+      h("a", { class: "cohort-status-link", href: "#/students?status=" + tier },
+        badge(tier), h("strong", null, d.counts[tier]), icon("arrow"))))),
+    h("a", { class: "btn cohort-directory-link", href: "#/students?status=all" }, t("allStudents"), icon("arrow")));
 }
 function groupBars(d) {
   const W=600,H=220,p={l:34,r:12,t:18,b:30},n=Math.max(1,d.groups.length);
@@ -426,27 +413,14 @@ function sectionHead(title, eyebrow, subtitle) {
       h("h2", null, title), subtitle ? h("p", { class: "muted small" }, subtitle) : null));
 }
 function overviewView(d) {
-  const pageHead = h("div", { class: "hero" },
-    h("div", { class: "hero-copy" },
-      h("div", { class: "hero-overline" }, h("span", { class: "overline-square" }), t("workspace"), h("span", { class: "overline-sep" }, "/"), t("nav_overview")),
-      h("h1", null, t("ov_title")),
-      h("p", { class: "muted hero-description" }, t("ov_sub", { w: d.weeks, n: d.students }))),
-    h("div", { class: "hero-meta" }, d.demo ? demoPill() : null));
-  return h("div", { class: "dashboard" },
-    pageHead,
-    h("div", { class: "stat-grid" },
-      statCard(d.students, t("sec_people"), t("stat_caption"), "people"),
-      statCard(d.counts.help, t("tier_help"), t("stat_needs"), "focus", "urgent"),
-      statCard(trendText(d.trend), t("stat_trend"), t("stat_activity"), "activity"),
-      statCard(d.counts.ok, t("tier_ok"), t("status_ok"), "people", "positive")),
-    h("div", { class: "grid feature-grid" },
-      trendPanel(d),
-      h("section", { class: "card distribution-card" },
-        sectionHead(t("distribution"), null, t("distribution_note")),
-        donut(d), tierBar(d.counts))),
-    h("div", { class: "grid priority-grid" },
-      urgentPanel(d),
-      h("section", { class: "card activity-card" }, activityMatrix(d))),
+  return h("div", { class: "dashboard teacher-overview" },
+    h("div", { class: "page-title overview-title" },
+      h("div", null, h("h1", null, t("nav_overview")),
+        h("p", { class: "muted" }, t("ov_sub", { w: d.weeks, n: d.students }))),
+      d.demo ? demoPill() : null),
+    h("div", { class: "grid overview-priority" }, urgentPanel(d), cohortSummary(d)),
+    h("div", { class: "grid feature-grid overview-activity" },
+      trendPanel(d), h("section", { class: "card activity-card" }, activityMatrix(d))),
     h("div", { class: "grid secondary-grid" },
       h("section", { class: "card" }, groupBars(d)),
       h("section", { class: "card explanation" }, sectionHead(t("how_to_read")),
@@ -460,7 +434,7 @@ async function render() {
   const mine=++seq,root=document.getElementById('app');
   document.title=t('app_title');
   const raw=location.hash.replace(/^#\//,'')||'';
-  const route=raw.split('?')[0];
+  const [route,query]=raw.split('?');
   if(!S.user){
     if(S.token){try{const me=await api('/api/me');S.user=me.user;}catch(e){endSession();}if(mine!==seq)return;}
     if(!S.user){root.replaceChildren(loginView());return;}
@@ -485,7 +459,7 @@ async function render() {
   if(!url){slot.replaceChildren(placeholder('nav_overview'));return;}
   const show=d=>{
     if(page==='overview')return overviewView(d);
-    if(page==='students')return studentsPage(d);
+    if(page==='students')return studentsPage(d,new URLSearchParams(query).get('status'));
     if(page.startsWith('student/'))return studentDetailPage(d);
     if(page==='predict')return predictPage(d);
     if(page==='predict/new'||profilePrediction)return singlePredictionPage(d);
