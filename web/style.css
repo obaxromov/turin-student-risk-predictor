@@ -1057,6 +1057,42 @@ button,select,input {letter-spacing:normal;}
 }
 .projection-message{font-weight:650;font-size:clamp(16px,2vw,20px);line-height:1.45;color:var(--ink);}
 
+/* Overview starts with actions, with context and trends beneath it. */
+.overview-title{margin-bottom:20px;}
+.overview-priority{grid-template-columns:minmax(0,1.8fr) minmax(240px,1fr);align-items:start;}
+.teacher-overview .priority-head{align-items:flex-start;gap:14px;margin-bottom:14px;}
+.teacher-overview .priority-head h2{font-size:18px;}
+.priority-head p,.trend-overview{margin-top:5px;line-height:1.45;}
+.teacher-overview .student-search{
+  width:100%;min-width:130px;min-height:44px;padding-inline-start:34px;font-size:13px;background:var(--surface-2);
+}
+.priority-list,.cohort-status-list{list-style:none;padding:0;margin:0;}
+.priority-list li+li,.cohort-status-list li+li{border-top:1px solid var(--line);}
+.priority-student{
+  display:grid;grid-template-columns:minmax(0,1fr) auto 18px;align-items:center;gap:16px;
+  min-height:58px;padding:10px 8px;color:var(--ink);text-decoration:none;border-radius:10px;
+}
+.priority-student:hover,.cohort-status-link:hover{background:var(--surface-2);}
+.priority-student:focus-visible,.cohort-status-link:focus-visible{outline-offset:-2px;}
+.priority-identity{display:grid;gap:4px;min-width:0;}
+.priority-identity strong,.priority-score{font-weight:650;font-variant-numeric:tabular-nums;}
+.priority-reason{font-size:13px;line-height:1.45;overflow-wrap:anywhere;}
+.priority-state{display:flex;align-items:center;justify-content:flex-end;gap:14px;}
+.priority-score{display:grid;justify-items:end;gap:2px;min-width:42px;font-size:15px;}
+.priority-score small{font-size:11px;font-weight:500;}
+.priority-arrow,.cohort-status-link .ui-icon{color:var(--muted);}
+.priority-arrow .ui-icon,.cohort-status-link .ui-icon,.cohort-directory-link .ui-icon{width:16px;height:16px;flex:none;}
+.overview-cohort .cohort-bar{margin:14px 0 18px;box-shadow:none;}
+.cohort-bar i{background:var(--c);box-shadow:none;filter:none;}
+.cohort-status-link{
+  display:grid;grid-template-columns:minmax(0,1fr) auto 16px;align-items:center;gap:9px;
+  min-height:44px;padding:7px 6px;color:var(--ink);text-decoration:none;border-radius:9px;
+}
+.cohort-status-link .badge{justify-self:start;}
+.cohort-status-link strong{font-variant-numeric:tabular-nums;}
+.cohort-directory-link{width:100%;justify-content:space-between;gap:9px;margin-top:16px;text-decoration:none;}
+.overview-activity{align-items:start;}
+
 /* Teacher workspace: cohort directory and prediction tools. */
 .student-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;}
 .student-filter{
@@ -1076,7 +1112,10 @@ button,select,input {letter-spacing:normal;}
 .student-directory-search .field{padding-inline-start:38px;}
 .student-directory .field,.prediction-workspace .field{background:var(--surface-2);}
 .student-directory .field::placeholder{color:var(--muted);opacity:1;}
-.student-count{margin:14px 0;}
+.student-directory .student-filters{margin-top:14px;}
+.student-results-header{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;margin:4px 0;}
+.student-results-header .btn{flex:none;}
+.student-count{margin:0;}
 .student-directory-table{min-width:590px;}
 .student-directory-table th{position:sticky;top:0;z-index:2;background:var(--panel-quiet);}
 .student-cell-label{display:none;}
@@ -1112,7 +1151,25 @@ button,select,input {letter-spacing:normal;}
 .prediction-csv-results>.btn{margin-top:16px;}
 .prediction-csv-results .tablewrap{margin-top:14px;}
 
+@media(min-width:901px){
+  .topbar{background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none;}
+  .topbar-in{min-height:67px;}
+  .topbar .tabs{height:67px;align-items:stretch;}
+  .topbar .tab{height:auto;border-radius:0;font-size:13px;}
+  .topbar .tab[aria-current="page"]{background:transparent;box-shadow:none;color:var(--blue-hover);}
+  .topbar .tab[aria-current="page"]::after{display:block;inset-inline:12px;height:2px;background:var(--blue);}
+  .teacher-overview .card,.students-workspace .card,.prediction-workspace .card{
+    background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:var(--shadow);
+  }
+  .student-directory .student-filter{min-height:43px;padding:7px 13px;background:var(--surface);}
+  .student-directory .student-filter[aria-pressed="true"]{background:var(--blue-soft);}
+  .student-directory .student-filter strong{font-size:14px;}
+  .student-directory .student-action .btn{padding-inline:5px;background:transparent;border-color:transparent;box-shadow:none;color:var(--blue-hover);}
+}
+
 @media(max-width:900px){
+  .overview-priority{grid-template-columns:minmax(0,1fr);}
+  .cohort-directory-link{min-height:44px;}
   .topbar-in{display:grid;grid-template-columns:minmax(0,1fr) auto;padding-bottom:8px;}
   .topbar .brand{grid-area:1/1;min-width:0;}
   .topbar .brand-text strong{overflow-wrap:anywhere;}
@@ -1131,6 +1188,15 @@ button,select,input {letter-spacing:normal;}
   .prediction-output{scroll-margin-top:16px;}
 }
 @media(max-width:680px){
+  .teacher-overview .priority-head{display:grid;}
+  .teacher-overview .priority-head .search-shell{width:100%;}
+  .teacher-overview .student-search{font-size:16px;}
+  .priority-student{min-height:64px;padding-inline:3px;gap:7px;grid-template-columns:minmax(0,1fr) auto 14px;}
+  .priority-state{display:grid;justify-items:end;gap:4px;}
+  .priority-reason{font-size:12px;}
+  .priority-score{display:flex;align-items:baseline;gap:4px;font-size:14px;}
+  .priority-score small{font-size:10px;}
+  .student-results-header .btn{min-height:44px;}
   .student-filters{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
   .student-filter{min-height:48px;padding:8px 10px;}
   .student-toolbar{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;}
