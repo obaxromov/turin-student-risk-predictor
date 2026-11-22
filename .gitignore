@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+data/app.db
+data/*.db-journal
+.venv/
+data/cache/
+
+.pytest_tmp/
+data/files/
+
+# Historical/student records, uploaded materials, credentials, generated models
+data/
+.venv314/
+.env
+.env.*

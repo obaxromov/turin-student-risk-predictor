@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: turin-student-risk-predictor
+    runtime: docker
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: "7860"
+      - key: APP_DEMO_LOGIN
+        value: "0"
+      - key: APP_ADMIN_PASSWORD
+        generateValue: true
+      - key: APP_TEACHER_PASSWORD
+        generateValue: true
+      - key: APP_STUDENT_PASSWORD
+        generateValue: true

@@ -1,0 +1,13 @@
+# Student Risk Predictor web application (Python 3.11–3.14).
+# Python 3.14 requires newer prebuilt wheels of the scientific libraries.
+# On Windows, prefer the included start-python314.cmd launcher for an isolated installation.
+fastapi>=0.110
+uvicorn>=0.29
+pandas>=2.3.3,<3; python_version >= "3.14"
+pandas>=2.0,<3; python_version < "3.14"
+numpy>=2.4,<3; python_version >= "3.14"
+numpy>=1.26,<3; python_version < "3.14"
+scipy>=1.17,<2; python_version >= "3.14"
+scikit-learn>=1.8,<2; python_version >= "3.14"
+scikit-learn>=1.4,<2; python_version < "3.14"
+joblib>=1.3

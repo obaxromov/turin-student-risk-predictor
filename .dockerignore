@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.pytest_tmp/
+tests/
+.venv/
+data/app.db
+data/files/
+
+# Keep local student records and credential files out of Docker images
+data/
+.venv314/
+.env
+.env.*
