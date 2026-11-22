@@ -1074,6 +1074,8 @@ button,select,input {letter-spacing:normal;}
   position:absolute;left:12px;top:50%;width:16px;height:16px;transform:translateY(-50%);color:var(--subtle);pointer-events:none;
 }
 .student-directory-search .field{padding-inline-start:38px;}
+.student-directory .field,.prediction-workspace .field{background:var(--surface-2);}
+.student-directory .field::placeholder{color:var(--muted);opacity:1;}
 .student-count{margin:14px 0;}
 .student-directory-table{min-width:590px;}
 .student-directory-table th{position:sticky;top:0;z-index:2;background:var(--panel-quiet);}
@@ -1105,9 +1107,12 @@ button,select,input {letter-spacing:normal;}
 .prediction-csv-results .tablewrap{margin-top:14px;}
 
 @media(max-width:900px){
-  .topbar-in{padding-bottom:8px;}
+  .topbar-in{display:grid;grid-template-columns:minmax(0,1fr) auto;padding-bottom:8px;}
+  .topbar .brand{grid-area:1/1;min-width:0;}
+  .topbar .brand-text strong{overflow-wrap:anywhere;}
+  .topbar .acct{grid-area:1/2;justify-self:end;}
   .topbar .tabs{
-    display:grid;grid-template-columns:repeat(3,minmax(0,1fr));height:auto;overflow:visible;gap:3px 5px;
+    grid-area:2/1/3/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));height:auto;overflow:visible;gap:3px 5px;
   }
   .topbar .tabs-admin{grid-template-columns:minmax(0,1fr);}
   .topbar .tab{
