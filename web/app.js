@@ -46,10 +46,11 @@ const L = {
   password_hide: ["Hide password", "Скрыть пароль", "Parolni yashirish"],
   demo_preview: ["A thoughtful space for better decisions", "Продуманное пространство для важных решений", "Yaxshi qarorlar uchun qulay muhit"],
   live_system: ["Your learning workspace", "Ваша учебная панель", "Sizning taʼlim ish joyingiz"],
+  mainNav: ["Main navigation", "Основная навигация", "Asosiy navigatsiya"],
 
 };
 
-const S = { lang: "en", i18n: {}, cfg: { demo_mode: false }, token: null, user: null, menuOpen: false, overviewCache: null, overviewCachedAt: 0, trendRange: "all" };
+const S = { lang: "en", i18n: {}, cfg: { demo_mode: false }, token: null, user: null, menuOpen: false, overviewCache: null, overviewCachedAt: 0, trendRange: "all", predictionDraft: {} };
 
 try { const l = localStorage.getItem("lang"); if (l in LANGS) S.lang = l; } catch (e) { /* storage blocked */ }
 try { S.token = sessionStorage.getItem("token"); } catch (e) { /* storage blocked: sign-in lasts until reload */ }
@@ -121,6 +122,7 @@ function startSession(d) {
 }
 function endSession() {
   S.token = null; S.user = null; S.menuOpen = false; S.overviewCache = null; S.overviewCachedAt = 0;
+  S.predictionDraft = {};
   try { sessionStorage.removeItem("token"); } catch (e) { /* ignore */ }
 }
 
@@ -251,7 +253,7 @@ function shell(route, body) {
     } }, t("jump_content")),
     h("header", { class: "topbar" }, h("div", { class: "topbar-in" },
       h("div", { class: "brand" }, brandMark(), h("div", { class: "brand-text" }, h("strong", null, t("app_title")), h("span", null, t("insights")))),
-      h("nav", { class: "tabs", "aria-label": "Main" }, NAV[u.role].map(([k, key]) =>
+       h("nav", { class: "tabs tabs-" + u.role, "aria-label": t("mainNav") }, NAV[u.role].map(([k, key]) =>
         h("a", { class: "tab", href: "#/" + k, "aria-current": route === k ? "page" : null }, t(key)))),
       h("div", { class: "acct" }, toggle, menu))),
     h("main", { id: "main-content", tabindex: "-1" }, body),
@@ -464,16 +466,18 @@ async function render() {
     if(!S.user){root.replaceChildren(loginView());return;}
   }
   const role=S.user.role,known=NAV[role].map(x=>x[0]);
-  const extra=role==='teacher'&&(route.startsWith('student/')||route==='new-assignment');
+  const predictionDetail=route==='predict/new'||route==='predict/csv';
+  const extra=role==='teacher'&&(route.startsWith('student/')||route==='new-assignment'||predictionDetail);
   const assignmentDetail=(role==='student'||role==='teacher')&&/^assignment\/\d+$/.test(route);
   const page=known.includes(route)||extra||assignmentDetail?route:known[0];
   if(page!==route){location.hash='#/'+page;return;}
-  const activeNav=page.startsWith('student/')?'students':page.startsWith('assignment/')||page==='new-assignment'?'assignments':page;
+  const activeNav=extra&&predictionDetail?'predict':
+    page.startsWith('student/')?'students':page.startsWith('assignment/')||page==='new-assignment'?'assignments':page;
   const slot=h('div',{class:'page-slot'},h('div',{class:'skeleton'}));
   root.replaceChildren(shell(activeNav,slot));
   const paths={overview:'/api/overview',students:'/api/students',predict:'/api/model',model:'/api/model',
     courses:'/api/courses',assignments:'/api/assignments',home:'/api/home',accounts:'/api/accounts',
-    'new-assignment':'/api/courses'};
+    'new-assignment':'/api/courses','predict/new':'/api/model','predict/csv':'/api/model'};
   const url=page.startsWith('student/')?'/api/students/'+page.split('/')[1]:
     page.startsWith('assignment/')?'/api/assignments/'+page.split('/')[1]:paths[page];
   if(!url){slot.replaceChildren(placeholder('nav_overview'));return;}
@@ -482,6 +486,8 @@ async function render() {
     if(page==='students')return studentsPage(d);
     if(page.startsWith('student/'))return studentDetailPage(d);
     if(page==='predict')return predictPage(d);
+    if(page==='predict/new')return singlePredictionPage(d);
+    if(page==='predict/csv')return csvPredictionPage(d);
     if(page==='model')return modelPage(d);
     if(page==='courses')return coursePage(d);
     if(page==='assignments')return assignmentsPage(d);
@@ -510,7 +516,11 @@ async function boot() {
     const [cfg,i18n]=await Promise.all([fetch('/api/config').then(r=>r.json()),fetch('/api/i18n').then(r=>r.json())]);
     S.cfg=cfg;S.i18n=i18n;
   }catch(e){document.getElementById('app').textContent=t('neterr');return;}
-  window.addEventListener('hashchange',()=>{S.menuOpen=false;render();});
+  window.addEventListener('hashchange',()=>{
+    S.menuOpen=false;
+    window.scrollTo(0,0);
+    render();
+  });
   document.addEventListener('pointermove',ev=>{
     const el=ev.target.closest('.btn,.account-toggle,.seg button,.course-tile,.liquid-trigger');
     if(!el)return;

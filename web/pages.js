@@ -2,9 +2,13 @@
 /* The website's full Teacher / Student / Admin pages. API owns data and permissions. */
 Object.assign(L, {
   allStudents:["All students","Все студенты","Barcha talabalar"],
-  everyStudent:["Complete cohort · all students","Весь поток · все студенты","Barcha guruh · barcha talabalar"],
+  directoryIntro:["Find a student by ID, group, or support status.","Найдите студента по ID, группе или статусу.","Talabani ID, guruh yoki holat boʻyicha toping."],
   allGroups:["All groups","Все группы","Barcha guruhlar"],
   allStatuses:["All statuses","Все статусы","Barcha holatlar"],
+  studentSort:["Sort by","Сортировка","Saralash"],
+  highestRisk:["Highest risk first","Сначала высокий риск","Avval xavfi yuqori talabalar"],
+  shownStudents:["{shown} of {total} students","{shown} из {total} студентов","{total} talabadan {shown} tasi"],
+  openStudent:["Open profile: {id}","Открыть профиль: {id}","Profilni ochish: {id}"],
   noUpcoming:["Nothing due soon.","Ближайших заданий нет.","Yaqin topshiriqlar yoʻq."],
   tierOutcome:["Actual failure rate by tier (held-out data)","Доля неуспешных по категориям (тест)","Daraja boʻyicha muvaffaqiyatsizlik (test)"],
   csvQuestions:["Import questions from CSV","Импорт вопросов из CSV","Savollarni CSV dan yuklash"],
@@ -77,6 +81,18 @@ Object.assign(L, {
   currentGrade:["My grade","Моя оценка","Mening bahom"],
   modelDisclaimer:["Simulated demonstration data. The model scores are not calibrated probabilities or verified real-world accuracy.","Демонстрационные синтетические данные. Оценки модели не являются проверенными вероятностями или реальной точностью.","Sunʼiy demo maʼlumotlari. Model baholari haqiqiy ehtimollik yoki tasdiqlangan aniqlik emas."],
   tryPredict:["Run prediction","Запустить прогноз","Bashorat qilish"],
+  predictOne:["Single student","Один студент","Bitta talaba"],
+  predictOneInfo:["Enter attendance, activity, and grades to estimate one student's risk.","Введите посещаемость, активность и оценки, чтобы оценить риск для одного студента.","Bitta talabaning xavfini baholash uchun davomat, faollik va baholarni kiriting."],
+  predictBatch:["CSV batch","Пакетный прогноз CSV","CSV orqali guruhni baholash"],
+  predictBatchInfo:["Upload several students in one file and download their results.","Загрузите данные нескольких студентов одним файлом и скачайте результаты.","Bir faylda bir nechta talaba maʼlumotlarini yuklang va natijalarni yuklab oling."],
+  enterStudentData:["Enter student data","Ввести данные студента","Talaba maʼlumotlarini kiritish"],
+  predictionBack:["Back to Predict","Назад к прогнозам","Bashoratga qaytish"],
+  engagementFields:["Attendance and activity","Посещаемость и активность","Davomat va faollik"],
+  courseworkFields:["Grades and coursework","Оценки и задания","Baholar va topshiriqlar"],
+  useTypicalValues:["Fill with typical values","Заполнить типичными значениями","Odatiy qiymatlar bilan toʻldirish"],
+  predictionRange:["Range: {min} to {max}","Диапазон: от {min} до {max}","Oraliq: {min} dan {max} gacha"],
+  choosePredictionCsv:["Student CSV file","CSV-файл со студентами","Talabalar uchun CSV fayl"],
+  readPredictionCsvError:["Could not read the CSV file.","Не удалось прочитать CSV-файл.","CSV faylni oʻqib boʻlmadi."],
   importCsv:["Score a CSV","Проверить CSV","CSV ni baholash"],
   csvHint:["CSV columns must match all eight model inputs. Maximum 5,000 rows / 2 MB.","CSV должен содержать все восемь параметров. До 5 000 строк / 2 МБ.","CSV sakkizta parametrni oʻz ichiga olishi kerak. 5 000 qator / 2 MB."],
   sampleCsv:["Download sample CSV","Скачать образец CSV","CSV namunasini olish"],
@@ -213,29 +229,47 @@ function shortReason(reason){return reason ? reasonText(reason):t('dt_why_none')
 
 /* FULL teacher cohort: no .head() slice, no pagination hiding the rest. */
 function studentsPage(d){
-  let q='',tier='all',group='all',sort='id';
-  const filter=t=>!q||t.student_id.toLowerCase().includes(q);
+  let tier='all';
+  const totals={all:d.total,help:0,watch:0,ok:0};
+  d.students.forEach(r=>totals[r.tier]++);
   const list=h('div');
-  const search=h('input',{class:'field',type:'search',placeholder:t('studentSearch'),'aria-label':t('studentSearch'),oninput:ev=>{q=ev.target.value.toLowerCase().trim();draw();}});
-  const ts=selectField(t('filter'),[['all',t('allStatuses')],['help',t('tier_help')],['watch',t('tier_watch')],['ok',t('tier_ok')]],'all',ev=>{tier=ev.target.value;draw();});
-  const gs=selectField(t('filter_group'),[['all',t('allGroups')],...[...new Set(d.students.map(r=>r.group))].map(g=>[g,g])],'all',ev=>{group=ev.target.value;draw();});
-  const count=h('span',{class:'small muted'});
+  const search=h('input',{class:'field',type:'search',maxlength:40,placeholder:t('studentSearch'),'aria-label':t('studentSearch'),oninput:draw});
+  const groups=[...new Set(d.students.map(r=>r.group))].sort((a,b)=>a.localeCompare(b));
+  const gs=selectField(t('filter_group'),[['all',t('allGroups')],...groups.map(g=>[g,g])],'all',draw);
+  const sort=selectField(t('studentSort'),[['id',t('col_student')],['risk',t('highestRisk')]],'id',draw);
+  const count=h('p',{class:'small muted student-count',role:'status'});
+  const statusButtons=['all','help','watch','ok'].map(k=>h('button',{
+    class:'student-filter t-'+k,type:'button','data-tier':k,'aria-pressed':String(k===tier),
+    onclick:()=>{tier=k;draw();}
+  },h('span',null,t(k==='all'?'allStudents':'tier_'+k)),h('strong',null,totals[k])));
+  const columns=['col_student','group','col_tier','col_risk','activity','viewProfile'];
+  const cell=(k,child,cls)=>h('td',{class:cls,role:'cell'},h('span',{class:'student-cell-label','aria-hidden':'true'},t(k)),child);
   function draw(){
-    const rows=d.students.filter(r=>filter(r)&&(tier==='all'||r.tier===tier)&&(group==='all'||r.group===group))
-      .sort((a,b)=>sort==='risk'?b.risk-a.risk:a.student_id.localeCompare(b.student_id));
-    count.textContent=rows.length+' / '+d.total+' '+t('students_unit');
-    list.replaceChildren(rows.length?h('div',{class:'tablewrap all-students'},h('table',{class:'tbl big-table'},
-      tableHead([t('col_student'),t('group'),t('col_tier'),t('col_risk'),t('activity'),t('viewProfile')]),
-      h('tbody',null,rows.map(r=>h('tr',null,
-        h('td',{class:'id'},r.student_id),h('td',null,r.group),h('td',null,badge(r.tier)),
-        h('td',null,h('div',{class:'risk t-'+r.tier},h('div',{class:'bar'},h('i',{style:null})),h('span',null,r.risk+'%'))),
-        h('td',null,num(r.weeks.reduce((a,b)=>a+b,0)/r.weeks.length)+'%'),
-        h('td',null,linkButton(t('viewProfile'),()=>goTo('student/'+r.student_id),'quiet'))))))):notice(t('no_matches')));
-    list.querySelectorAll('.risk .bar i').forEach((el,i)=>{el.style.width=rows[i].risk+'%';});
+    const query=search.value.trim().toLowerCase();
+    const rows=d.students.filter(r=>r.student_id.toLowerCase().includes(query)
+      &&(tier==='all'||r.tier===tier)&&(gs.input.value==='all'||r.group===gs.input.value))
+      .sort((a,b)=>(sort.input.value==='risk'?b.risk-a.risk:0)||a.student_id.localeCompare(b.student_id));
+    statusButtons.forEach(btn=>btn.setAttribute('aria-pressed',String(btn.dataset.tier===tier)));
+    count.textContent=t('shownStudents',{shown:rows.length,total:d.total});
+    const body=rows.map(r=>{
+      const fill=h('i');fill.style.width=r.risk+'%';
+      return h('tr',{role:'row'},
+        cell('col_student',h('strong',null,r.student_id),'id student-identity'),
+        cell('group',r.group,'student-group'),
+        cell('col_tier',badge(r.tier),'student-status'),
+        cell('col_risk',h('div',{class:'risk t-'+r.tier},h('div',{class:'bar','aria-hidden':'true'},fill),h('span',null,r.risk+'%')),'student-risk'),
+        cell('activity',num(r.weeks.reduce((a,b)=>a+b,0)/r.weeks.length)+'%','student-activity'),
+        h('td',{class:'student-action',role:'cell'},h('a',{class:'btn quiet',href:'#/student/'+encodeURIComponent(r.student_id),
+          'aria-label':t('openStudent',{id:r.student_id})},t('viewProfile'),icon('arrow'))));
+    });
+    list.replaceChildren(rows.length?h('div',{class:'tablewrap all-students'},h('table',{
+      class:'tbl student-directory-table',role:'table','aria-label':t('allStudents')},
+      tableHead(columns.map(k=>t(k))),h('tbody',{role:'rowgroup'},body))):notice(t('no_matches')));
   }
-  const sortbtn=linkButton(t('col_risk')+' ↓',()=>{sort=sort==='risk'?'id':'risk';sortbtn.textContent=sort==='risk'?t('col_student')+' ↑':t('col_risk')+' ↓';draw();},'quiet');
-  const page=h('div',{class:'dashboard inner-page'},paneHeading(t('nav_students'),t('everyStudent'),demoPill()),
-    h('section',{class:'card'},h('div',{class:'toolbar'},search,ts.wrap,gs.wrap,sortbtn,count),list));
+  const page=h('div',{class:'dashboard inner-page'},paneHeading(t('nav_students'),t('directoryIntro'),d.demo?demoPill():null),
+    h('div',{class:'student-filters',role:'group','aria-label':t('allStatuses')},statusButtons),
+    h('section',{class:'card student-directory'},h('div',{class:'student-toolbar'},
+      h('div',{class:'student-directory-search'},icon('search'),search),gs.wrap,sort.wrap),count,list));
   draw();return page;
 }
 function studentDetailPage(d){
@@ -321,34 +355,118 @@ function modelPage(d){
     ]),
     cardText(t('how_to_read'),[...rich(t('md_how_body'))]));
 }
+const PREDICTION_FIELDS=[
+  ['engagementFields',[
+    ['attendance',0,100],['attendance_trend',-100,100],['logins_per_week',0,200],['logins_trend',-100,1000]
+  ]],
+  ['courseworkFields',[
+    ['test_avg',0,100],['hw_completion',0,100],['hw_avg',0,100],['prev_result',0,100]
+  ]]
+];
+
 function predictPage(d){
-  const fields={}; const inputs=h('div',{class:'form-grid'},d.medians&&Object.entries(d.medians).map(([f,v])=>{
-    const range={attendance:[0,100],attendance_trend:[-100,100],test_avg:[0,100],hw_completion:[0,100],hw_avg:[0,100],logins_per_week:[0,200],logins_trend:[-100,1000],prev_result:[0,100]};
-    const el=h('input',{class:'field',type:'number',min:range[f][0],max:range[f][1],step:'.1',value:num(v,1),required:true});fields[f]=el;
-    return h('label',{class:'control-label'},featureText(f),el);
-  }));
-  const res=h('div',{class:'result-slot'});
-  const form=h('form',{onsubmit:ev=>{ev.preventDefault();doRequest('/api/predict',{method:'POST',body:{values:Object.fromEntries(Object.entries(fields).map(([k,v])=>[k,Number(v.value)]))}},a=>{
-    res.replaceChildren(h('div',{class:'prediction-result'},h('div',null,h('p',{class:'eyebrow'},t('pr_result')),h('h2',null,a.risk+'%'),badge(a.tier)),
-      h('div',null,h('h3',null,t('why')),...a.reasons.map(shortReason).map(s=>h('p',null,s)),h('p',{class:'muted small'},modelCaveat(d)))));},res);
-  }},inputs,h('div',{class:'button-row'},h('button',{class:'btn primary',type:'submit'},t('tryPredict'))));
-  const csvfile=h('input',{type:'file',accept:'.csv,text/csv',class:'field'});const resultCsv=h('div');let csvRows=[];
-  const csvForm=h('form',{class:'stack',onsubmit:async ev=>{ev.preventDefault();const file=csvfile.files[0];if(!file)return;
-    if(file.size>2_000_000){resultCsv.replaceChildren(notice(t('csvHint')));return;}
-    doRequest('/api/predict/csv',{method:'POST',body:{content:await file.text()}},d=>{
-      if(d.problems){resultCsv.replaceChildren(notice(JSON.stringify(d.problems)));return;}
-      csvRows=d.rows;resultCsv.replaceChildren(h('p',{class:'muted small'},d.rows.length+' '+t('total')),
-        h('div',{class:'tablewrap'},h('table',{class:'tbl'},tableHead([t('col_student'),t('col_risk'),t('col_tier')]),
-          h('tbody',null,d.rows.slice(0,150).map(r=>h('tr',null,h('td',null,r.student_id),h('td',null,r.risk+'%'),h('td',null,badge(r.tier))))))),
+  const tools=[
+    ['predict/new','predictOne','predictOneInfo','enterStudentData','activity'],
+    ['predict/csv','predictBatch','predictBatchInfo','importCsv','people']
+  ];
+  return h('div',{class:'dashboard inner-page prediction-workspace'},paneHeading(t('pr_title'),t('pr_sub'),d.demo?demoPill():null),
+    h('div',{class:'prediction-columns'},tools.map(([route,title,desc,action,symbol])=>
+      h('a',{class:'card prediction-option',href:'#/'+route},
+        h('span',{class:'stat-icon'},icon(symbol)),h('h2',null,t(title)),h('p',{class:'muted'},t(desc)),
+        h('span',{class:'prediction-option-action'},t(action),icon('arrow'))))),
+    h('p',{class:'muted small prediction-caveat'},modelCaveat(d)));
+}
+
+function predictionPageHeader(d,title,desc){
+  return [
+    h('div',{class:'sub-nav'},h('a',{class:'btn quiet prediction-back',href:'#/predict'},icon('arrow'),t('predictionBack'))),
+    paneHeading(t(title),t(desc),d.demo?demoPill():null)
+  ];
+}
+
+function singlePredictionPage(d){
+  const fields={};
+  const sections=PREDICTION_FIELDS.map(([title,items])=>h('section',{class:'card prediction-section'},
+    h('h2',null,t(title)),h('div',{class:'form-grid'},items.map(([key,min,max])=>{
+      const hint='range-'+key;
+      const input=h('input',{class:'field',name:key,type:'number',inputmode:'decimal',min,max,step:'.1',required:true,
+        'aria-describedby':hint,value:S.predictionDraft[key]??'',
+        oninput:()=>{S.predictionDraft[key]=input.value;}});
+      fields[key]=input;
+      return h('label',{class:'control-label'},h('span',null,featureText(key)),input,
+        h('small',{class:'muted',id:hint},t('predictionRange',{min,max})));
+    }))));
+  const result=h('div',{class:'prediction-output',tabindex:'-1','aria-live':'polite'});
+  const submit=h('button',{class:'btn primary',type:'submit'},t('tryPredict'));
+  const example=linkButton(t('useTypicalValues'),()=>{
+    Object.entries(fields).forEach(([key,input])=>{
+      const value=d.medians?.[key];
+      if(Number.isFinite(value))S.predictionDraft[key]=input.value=num(value,1);
+    });
+    result.replaceChildren();
+  });
+  const form=h('form',{class:'prediction-form',onsubmit:async ev=>{
+    ev.preventDefault();
+    if(submit.disabled)return;
+    submit.disabled=true;
+    result.replaceChildren(h('p',{class:'muted small'},t('loading')));
+    try{
+      const values=Object.fromEntries(Object.entries(fields).map(([key,input])=>[key,input.valueAsNumber]));
+      const prediction=await api('/api/predict',{method:'POST',body:{values}});
+      result.replaceChildren(h('section',{class:'card prediction-result'},
+        h('div',{class:'prediction-result-title'},h('h2',null,t('pr_result')),badge(prediction.tier)),
+        h('strong',{class:'prediction-score'},prediction.risk+'%'),
+        prediction.reasons.length?h('div',null,h('h3',null,t('why')),
+          h('ul',null,prediction.reasons.map(reason=>h('li',null,shortReason(reason))))):null,
+        h('p',{class:'muted small'},modelCaveat(prediction))));
+      if(result.isConnected)result.focus();
+    }catch(e){result.replaceChildren(notice(requestError(e)));}
+    finally{submit.disabled=false;}
+  }},h('div',{class:'prediction-columns'},sections),h('div',{class:'button-row prediction-actions'},submit,example));
+  return h('div',{class:'dashboard inner-page prediction-workspace'},
+    predictionPageHeader(d,'enterStudentData','predictOneInfo'),form,result);
+}
+
+function csvPredictionPage(d){
+  const fileInput=h('input',{type:'file',accept:'.csv,text/csv',class:'field',required:true});
+  const result=h('div',{class:'prediction-output','aria-live':'polite'});
+  const submit=h('button',{class:'btn primary',type:'submit'},t('importCsv'));
+  const downloadSample=linkButton(t('sampleCsv'),()=>{
+    const keys=PREDICTION_FIELDS.flatMap(([,fields])=>fields.map(([key])=>key));
+    const cells=keys.map(k=>Number.isFinite(d.medians?.[k])?num(d.medians[k],1):'');
+    saveBlob(new Blob(['student_id,'+keys.join(',')+'\nS001,'+cells.join(',')+'\n'],{type:'text/csv'}),'template.csv');
+  });
+  const form=h('form',{class:'stack',onsubmit:async ev=>{
+    ev.preventDefault();
+    const file=fileInput.files[0];
+    if(!file||submit.disabled)return;
+    if(file.size>2_000_000){result.replaceChildren(notice(t('csvHint')));return;}
+    submit.disabled=true;
+    result.replaceChildren(h('p',{class:'muted small'},t('loading')));
+    let content;
+    try{content=await file.text();}
+    catch(e){result.replaceChildren(notice(t('readPredictionCsvError')));submit.disabled=false;return;}
+    try{
+      const scored=await api('/api/predict/csv',{method:'POST',body:{content}});
+      if(scored.problems){result.replaceChildren(notice(JSON.stringify(scored.problems)));return;}
+      result.replaceChildren(cardText(t('pr_result'),[
+        h('p',{class:'muted small'},scored.rows.length+' '+t('total')),
+        h('div',{class:'tablewrap'},h('table',{class:'tbl prediction-csv-table'},
+          tableHead([t('col_student'),t('col_risk'),t('col_tier')]),
+          h('tbody',null,scored.rows.slice(0,150).map(r=>h('tr',null,h('td',{class:'id'},r.student_id),
+            h('td',null,r.risk+'%'),h('td',null,badge(r.tier))))))),
         linkButton(t('downloadResults'),()=>{
-          const safe=v=>{const s=String(v);return '"'+( /^[=+\-@]/.test(s)?"'"+s:s).replace(/"/g,'""')+'"';};
-          saveBlob(new Blob(['student_id,risk_percent,status\n'+csvRows.map(r=>[r.student_id,r.risk,r.tier].map(safe).join(',')).join('\n')],{type:'text/csv'}),'predictions.csv');
-        },'primary'));
-    },resultCsv);
-  }},csvfile,h('div',{class:'button-row'},h('button',{class:'btn primary',type:'submit'},t('importCsv')),
-    linkButton(t('sampleCsv'),()=>saveBlob(new Blob(['student_id,'+Object.keys(fields).join(',')+'\nS001,'+Object.values(fields).map(x=>x.value).join(',')+'\n'],{type:'text/csv'}),'template.csv'))),resultCsv);
-  return h('div',{class:'dashboard inner-page'},paneHeading(t('pr_title'),t('pr_sub'),d.demo?demoPill():null),
-    h('div',{class:'grid feature-grid'},cardText(t('pr_run'),[form,res]),cardText(t('importCsv'),[h('p',{class:'muted small'},t('csvHint')),csvForm])));
+          const safe=v=>{const s=String(v);return '"'+(/^[=+\-@]/.test(s)?"'"+s:s).replace(/"/g,'""')+'"';};
+          const csv='student_id,risk_percent,status\n'+scored.rows.map(r=>[r.student_id,r.risk,r.tier].map(safe).join(',')).join('\n');
+          saveBlob(new Blob([csv],{type:'text/csv'}),'predictions.csv');
+        },'primary')
+      ],'prediction-csv-results'));
+    }catch(e){result.replaceChildren(notice(requestError(e)));}
+    finally{submit.disabled=false;}
+  }},h('label',{class:'control-label'},t('choosePredictionCsv'),fileInput),
+    h('p',{class:'muted small'},t('csvHint')),h('div',{class:'button-row prediction-actions'},submit,downloadSample));
+  return h('div',{class:'dashboard inner-page prediction-workspace'},
+    predictionPageHeader(d,'predictBatch','predictBatchInfo'),h('section',{class:'card'},form),result);
 }
 function courseLook(name){
   const n=String(name||'').toLowerCase();
