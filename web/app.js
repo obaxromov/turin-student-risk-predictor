@@ -50,7 +50,7 @@ const L = {
 
 };
 
-const S = { lang: "en", i18n: {}, cfg: { demo_mode: false }, token: null, user: null, menuOpen: false, overviewCache: null, overviewCachedAt: 0, trendRange: "all", predictionDraft: {} };
+const S = { lang: "en", i18n: {}, cfg: { demo_mode: false }, token: null, user: null, menuOpen: false, overviewCache: null, overviewCachedAt: 0, trendRange: "all", predictionDrafts: new Map() };
 
 try { const l = localStorage.getItem("lang"); if (l in LANGS) S.lang = l; } catch (e) { /* storage blocked */ }
 try { S.token = sessionStorage.getItem("token"); } catch (e) { /* storage blocked: sign-in lasts until reload */ }
@@ -122,7 +122,7 @@ function startSession(d) {
 }
 function endSession() {
   S.token = null; S.user = null; S.menuOpen = false; S.overviewCache = null; S.overviewCachedAt = 0;
-  S.predictionDraft = {};
+  S.predictionDrafts.clear();
   try { sessionStorage.removeItem("token"); } catch (e) { /* ignore */ }
 }
 
@@ -466,7 +466,8 @@ async function render() {
     if(!S.user){root.replaceChildren(loginView());return;}
   }
   const role=S.user.role,known=NAV[role].map(x=>x[0]);
-  const predictionDetail=route==='predict/new'||route==='predict/csv';
+  const profilePrediction=/^predict\/student\/([^/]+)$/.exec(route);
+  const predictionDetail=route==='predict/new'||route==='predict/csv'||profilePrediction!==null;
   const extra=role==='teacher'&&(route.startsWith('student/')||route==='new-assignment'||predictionDetail);
   const assignmentDetail=(role==='student'||role==='teacher')&&/^assignment\/\d+$/.test(route);
   const page=known.includes(route)||extra||assignmentDetail?route:known[0];
@@ -478,7 +479,8 @@ async function render() {
   const paths={overview:'/api/overview',students:'/api/students',predict:'/api/model',model:'/api/model',
     courses:'/api/courses',assignments:'/api/assignments',home:'/api/home',accounts:'/api/accounts',
     'new-assignment':'/api/courses','predict/new':'/api/model','predict/csv':'/api/model'};
-  const url=page.startsWith('student/')?'/api/students/'+page.split('/')[1]:
+  const url=profilePrediction?'/api/students/'+profilePrediction[1]:
+    page.startsWith('student/')?'/api/students/'+page.split('/')[1]:
     page.startsWith('assignment/')?'/api/assignments/'+page.split('/')[1]:paths[page];
   if(!url){slot.replaceChildren(placeholder('nav_overview'));return;}
   const show=d=>{
@@ -486,7 +488,7 @@ async function render() {
     if(page==='students')return studentsPage(d);
     if(page.startsWith('student/'))return studentDetailPage(d);
     if(page==='predict')return predictPage(d);
-    if(page==='predict/new')return singlePredictionPage(d);
+    if(page==='predict/new'||profilePrediction)return singlePredictionPage(d);
     if(page==='predict/csv')return csvPredictionPage(d);
     if(page==='model')return modelPage(d);
     if(page==='courses')return coursePage(d);

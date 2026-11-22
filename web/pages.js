@@ -86,6 +86,15 @@ Object.assign(L, {
   predictBatch:["CSV batch","Пакетный прогноз CSV","CSV orqali guruhni baholash"],
   predictBatchInfo:["Upload several students in one file and download their results.","Загрузите данные нескольких студентов одним файлом и скачайте результаты.","Bir faylda bir nechta talaba maʼlumotlarini yuklang va natijalarni yuklab oling."],
   enterStudentData:["Enter student data","Ввести данные студента","Talaba maʼlumotlarini kiritish"],
+  predictFromProfile:["Predict from profile","Прогноз по профилю","Profil asosida bashorat"],
+  profilePredictionTitle:["Predict for {id}","Прогноз для {id}","{id} uchun bashorat"],
+  profilePredictionIntro:["Review the values from this student’s profile. Any edits apply to this prediction.","Проверьте значения из профиля студента. Изменения учитываются в этом прогнозе.","Talaba profilidagi qiymatlarni tekshiring. Oʻzgarishlar shu bashoratga tatbiq etiladi."],
+  profilePredictionBack:["Back to profile","Назад к профилю","Profilga qaytish"],
+  resetProfileInputs:["Reset to profile values","Вернуть значения из профиля","Profil qiymatlarini tiklash"],
+  followUpNote:["Follow-up note","Заметка о дальнейших действиях","Keyingi qadamlar haqida izoh"],
+  saveFollowUpNote:["Save follow-up note","Сохранить заметку","Izohni saqlash"],
+  followUpSaved:["Note saved to the student’s profile.","Заметка сохранена в профиле студента.","Izoh talaba profiliga saqlandi."],
+  followUpRequired:["Enter a note before saving.","Введите текст заметки.","Saqlashdan oldin izoh kiriting."],
   predictionBack:["Back to Predict","Назад к прогнозам","Bashoratga qaytish"],
   engagementFields:["Attendance and activity","Посещаемость и активность","Davomat va faollik"],
   courseworkFields:["Grades and coursework","Оценки и задания","Baholar va topshiriqlar"],
@@ -287,7 +296,9 @@ function studentDetailPage(d){
     paneHeading(t('profileTitle'),r.group,d.demo?demoPill():null),
     h('section',{class:'card profile-hero'},h('div',null,h('p',{class:'muted small'},t('col_student')),identity,
       h('div',{class:'profile-status'},badge(r.tier),h('strong',null,r.risk+'%'),h('span',{class:'muted'},t('col_risk')))),
-      h('div',{class:'button-row'},...(d.demo?[reveal,cbtn]:[cbtn])),d.demo?h('p',{class:'muted small'},t('revealExplain')):null),
+      h('div',{class:'button-row profile-actions'},h('a',{class:'btn primary profile-predict',
+        href:'#/predict/student/'+encodeURIComponent(r.student_id)},t('predictFromProfile'),icon('arrow')),
+        ...(d.demo?[reveal,cbtn]:[cbtn])),d.demo?h('p',{class:'muted small'},t('revealExplain')):null),
     h('div',{class:'grid feature-grid'},
       cardText(t('allFeatures'),[h('div',{class:'feature-stats'},Object.entries(d.features).map(([f,v])=>h('div',null,h('span',{class:'muted'},featureText(f)),h('b',null,num(v,1)),h('small',null,t('median')+': '+num(d.medians[f],1)))))]),
       cardText(t('individualTrend'),[smallAreaChart(r.weeks,d.class_weeks),h('p',{class:'muted small'},t('activityWeek'))])),
@@ -377,54 +388,95 @@ function predictPage(d){
     h('p',{class:'muted small prediction-caveat'},modelCaveat(d)));
 }
 
-function predictionPageHeader(d,title,desc){
+function predictionPageHeader(d,title,desc,student){
+  const back=student?'#/student/'+encodeURIComponent(student.student_id):'#/predict';
   return [
-    h('div',{class:'sub-nav'},h('a',{class:'btn quiet prediction-back',href:'#/predict'},icon('arrow'),t('predictionBack'))),
-    paneHeading(t(title),t(desc),d.demo?demoPill():null)
+    h('div',{class:'sub-nav'},h('a',{class:'btn quiet prediction-back',href:back},icon('arrow'),
+      t(student?'profilePredictionBack':'predictionBack'))),
+    paneHeading(t(title,student?{id:student.student_id}:null),t(desc),d.demo?demoPill():null)
   ];
 }
 
+function predictionFollowUp(student){
+  const note=h('textarea',{class:'field',rows:3,maxlength:1000,required:true,placeholder:t('note_ph'),
+    oninput:()=>note.setCustomValidity('')});
+  const submit=h('button',{class:'btn',type:'submit'},t('saveFollowUpNote'));
+  const message=h('div',{role:'status'});
+  return h('form',{class:'prediction-follow-up',onsubmit:async ev=>{
+    ev.preventDefault();
+    const body=note.value.trim();
+    if(submit.disabled)return;
+    if(!body){note.setCustomValidity(t('followUpRequired'));note.reportValidity();return;}
+    submit.disabled=true;
+    message.replaceChildren();
+    try{
+      await api('/api/students/'+encodeURIComponent(student.student_id)+'/notes',{method:'POST',body:{body}});
+      if(note.value.trim()===body)note.value='';
+      message.replaceChildren(notice(t('followUpSaved'),true));
+    }catch(e){message.replaceChildren(notice(requestError(e)));}
+    finally{submit.disabled=false;}
+  }},h('label',{class:'control-label'},h('span',null,t('followUpNote')),note),submit,message);
+}
+
 function singlePredictionPage(d){
+  const student=d.student??null;
+  const key=student?.student_id??null;
+  const startingValues=student?d.features:d.medians;
+  const draft=S.predictionDrafts.get(key)??{
+    values:Object.fromEntries(Object.entries(student?startingValues:{}).map(([name,value])=>[name,num(value,1)])),
+    result:null
+  };
+  S.predictionDrafts.set(key,draft);
+  let revision=0;
+  const result=h('div',{class:'prediction-output',tabindex:'-1','aria-live':'polite'});
+  const clearResult=()=>{revision++;draft.result=null;result.replaceChildren();};
   const fields={};
   const sections=PREDICTION_FIELDS.map(([title,items])=>h('section',{class:'card prediction-section'},
     h('h2',null,t(title)),h('div',{class:'form-grid'},items.map(([key,min,max])=>{
       const hint='range-'+key;
       const input=h('input',{class:'field',name:key,type:'number',inputmode:'decimal',min,max,step:'.1',required:true,
-        'aria-describedby':hint,value:S.predictionDraft[key]??'',
-        oninput:()=>{S.predictionDraft[key]=input.value;}});
+        'aria-describedby':hint,value:draft.values[key]??'',
+        oninput:()=>{draft.values[key]=input.value;clearResult();}});
       fields[key]=input;
       return h('label',{class:'control-label'},h('span',null,featureText(key)),input,
         h('small',{class:'muted',id:hint},t('predictionRange',{min,max})));
     }))));
-  const result=h('div',{class:'prediction-output',tabindex:'-1','aria-live':'polite'});
   const submit=h('button',{class:'btn primary',type:'submit'},t('tryPredict'));
-  const example=linkButton(t('useTypicalValues'),()=>{
-    Object.entries(fields).forEach(([key,input])=>{
-      const value=d.medians?.[key];
-      if(Number.isFinite(value))S.predictionDraft[key]=input.value=num(value,1);
+  const restore=linkButton(t(student?'resetProfileInputs':'useTypicalValues'),()=>{
+    Object.entries(fields).forEach(([name,input])=>{
+      const value=startingValues?.[name];
+      draft.values[name]=input.value=Number.isFinite(value)?num(value,1):'';
     });
-    result.replaceChildren();
+    clearResult();
   });
+  const showPrediction=prediction=>result.replaceChildren(h('section',{class:'card prediction-result'},
+    h('div',{class:'prediction-result-title'},h('h2',null,t('pr_result')),badge(prediction.tier)),
+    h('strong',{class:'prediction-score'},prediction.risk+'%'),
+    prediction.reasons.length?h('div',null,h('h3',null,t('why')),
+      h('ul',null,prediction.reasons.map(reason=>h('li',null,shortReason(reason))))):null,
+    h('p',{class:'muted small'},modelCaveat(prediction)),student?predictionFollowUp(student):null));
+  if(draft.result)showPrediction(draft.result);
   const form=h('form',{class:'prediction-form',onsubmit:async ev=>{
     ev.preventDefault();
     if(submit.disabled)return;
     submit.disabled=true;
+    const submittedRevision=revision;
+    draft.result=null;
     result.replaceChildren(h('p',{class:'muted small'},t('loading')));
     try{
       const values=Object.fromEntries(Object.entries(fields).map(([key,input])=>[key,input.valueAsNumber]));
       const prediction=await api('/api/predict',{method:'POST',body:{values}});
-      result.replaceChildren(h('section',{class:'card prediction-result'},
-        h('div',{class:'prediction-result-title'},h('h2',null,t('pr_result')),badge(prediction.tier)),
-        h('strong',{class:'prediction-score'},prediction.risk+'%'),
-        prediction.reasons.length?h('div',null,h('h3',null,t('why')),
-          h('ul',null,prediction.reasons.map(reason=>h('li',null,shortReason(reason))))):null,
-        h('p',{class:'muted small'},modelCaveat(prediction))));
-      if(result.isConnected)result.focus();
-    }catch(e){result.replaceChildren(notice(requestError(e)));}
+      if(submittedRevision===revision&&result.isConnected){
+        draft.result=prediction;
+        showPrediction(prediction);
+        result.focus();
+      }
+    }catch(e){if(submittedRevision===revision)result.replaceChildren(notice(requestError(e)));}
     finally{submit.disabled=false;}
-  }},h('div',{class:'prediction-columns'},sections),h('div',{class:'button-row prediction-actions'},submit,example));
+  }},h('div',{class:'prediction-columns'},sections),h('div',{class:'button-row prediction-actions prediction-form-actions'},submit,restore));
   return h('div',{class:'dashboard inner-page prediction-workspace'},
-    predictionPageHeader(d,'enterStudentData','predictOneInfo'),form,result);
+    predictionPageHeader(d,student?'profilePredictionTitle':'enterStudentData',
+      student?'profilePredictionIntro':'predictOneInfo',student),form,result);
 }
 
 function csvPredictionPage(d){
