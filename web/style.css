@@ -1100,9 +1100,15 @@ button,select,input {letter-spacing:normal;}
 .prediction-section .form-grid{gap:16px 14px;}
 .prediction-section .control-label small{font-weight:400;line-height:1.4;}
 .prediction-actions{margin-top:14px;}
+.profile-predict{gap:8px;text-decoration:none;}
+.profile-predict .ui-icon{height:15px;width:15px;flex:none;}
+.prediction-form-actions{position:relative;}
 .prediction-output:not(:empty),.prediction-caveat{margin-top:18px;}
 .prediction-output{scroll-margin-top:170px;}
 .prediction-score{font-size:clamp(35px,6vw,54px);color:var(--blue-hover);font-variant-numeric:tabular-nums;line-height:1;}
+.prediction-follow-up{display:grid;justify-items:start;gap:10px;padding-top:14px;border-top:1px solid var(--line);}
+.prediction-follow-up .control-label{width:100%;}
+.prediction-follow-up>div:empty{display:none;}
 .prediction-csv-results>.btn{margin-top:16px;}
 .prediction-csv-results .tablewrap{margin-top:14px;}
 
@@ -1154,8 +1160,24 @@ button,select,input {letter-spacing:normal;}
   .student-action .btn{min-height:44px;width:100%;}
   .prediction-columns{grid-template-columns:minmax(0,1fr);gap:11px;}
   .prediction-option{min-height:0;}
-  .prediction-section .form-grid{gap:12px;}
+  .profile-actions .btn,.prediction-back,.prediction-follow-up .btn{min-height:44px;}
+  .profile-predict{flex-basis:100%;justify-content:space-between;}
+  .prediction-workspace .page-title{margin-bottom:22px;}
+  .prediction-section .form-grid{gap:18px;}
+  .prediction-section .control-label,.prediction-follow-up .control-label{gap:6px;font-size:14px;color:var(--ink);}
+  .prediction-section .control-label small{font-size:12px;}
+  .prediction-section .field,.prediction-follow-up .field{
+    min-height:52px;border-radius:14px;font-size:16px;scroll-margin:170px 0 120px;
+  }
   .prediction-actions>.btn{min-height:44px;flex:1 1 180px;}
+  .prediction-form-actions{
+    position:sticky;bottom:0;z-index:6;gap:4px;padding:10px 12px calc(8px + env(safe-area-inset-bottom,0px));
+    border:1px solid var(--line);border-radius:18px;background:var(--surface);box-shadow:var(--panel-shadow);
+  }
+  .prediction-form-actions>.btn{flex:1 0 100%;}
+  .prediction-form-actions>.primary{min-height:50px;font-size:15px;}
+  .prediction-form-actions>.btn:not(.primary){background:transparent;border-color:transparent;box-shadow:none;}
+  .prediction-follow-up .btn{justify-self:stretch;}
   .prediction-csv-table,.prediction-csv-table tbody{display:table;}
   .prediction-csv-table tbody{display:table-row-group;}
   .prediction-csv-table thead{display:table-header-group;}
