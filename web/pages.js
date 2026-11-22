@@ -7,6 +7,7 @@ Object.assign(L, {
   allStatuses:["All statuses","Все статусы","Barcha holatlar"],
   studentSort:["Sort by","Сортировка","Saralash"],
   highestRisk:["Highest risk first","Сначала высокий риск","Avval xavfi yuqori talabalar"],
+  clearStudentFilters:["Clear filters","Сбросить фильтры","Filtrlarni tozalash"],
   shownStudents:["{shown} of {total} students","{shown} из {total} студентов","{total} talabadan {shown} tasi"],
   openStudent:["Open profile: {id}","Открыть профиль: {id}","Profilni ochish: {id}"],
   noUpcoming:["Nothing due soon.","Ближайших заданий нет.","Yaqin topshiriqlar yoʻq."],
@@ -236,29 +237,48 @@ function featureText(f){const k='feat_'+f;return S.i18n[k]?t(k):f.replace(/_/g,'
 function cardText(title,contents,cls=''){return h('section',{class:'card '+cls},h('h2',null,title),...contents);}
 function shortReason(reason){return reason ? reasonText(reason):t('dt_why_none');}
 
+function directoryFilters(tier='all'){
+  return {tier,query:'',group:'all',sort:tier==='all'?'id':'risk'};
+}
+
 /* FULL teacher cohort: no .head() slice, no pagination hiding the rest. */
-function studentsPage(d){
-  let tier='all';
+function studentsPage(d,requestedStatus){
   const totals={all:d.total,help:0,watch:0,ok:0};
+  if(Object.hasOwn(totals,requestedStatus)){
+    S.studentDirectory=directoryFilters(requestedStatus);
+    history.replaceState(history.state,'','#/students');
+  }
+  const filters=(S.studentDirectory??=directoryFilters());
   d.students.forEach(r=>totals[r.tier]++);
   const list=h('div');
-  const search=h('input',{class:'field',type:'search',maxlength:40,placeholder:t('studentSearch'),'aria-label':t('studentSearch'),oninput:draw});
+  const search=h('input',{class:'field',type:'search',maxlength:40,autocomplete:'off',placeholder:t('studentSearch'),
+    'aria-label':t('studentSearch'),value:filters.query,oninput:draw});
   const groups=[...new Set(d.students.map(r=>r.group))].sort((a,b)=>a.localeCompare(b));
-  const gs=selectField(t('filter_group'),[['all',t('allGroups')],...groups.map(g=>[g,g])],'all',draw);
-  const sort=selectField(t('studentSort'),[['id',t('col_student')],['risk',t('highestRisk')]],'id',draw);
+  const gs=selectField(t('filter_group'),[['all',t('allGroups')],...groups.map(g=>[g,g])],filters.group,draw);
+  const sort=selectField(t('studentSort'),[['id',t('col_student')],['risk',t('highestRisk')]],filters.sort,draw);
   const count=h('p',{class:'small muted student-count',role:'status'});
+  const clear=linkButton(t('clearStudentFilters'),()=>{
+    filters.tier='all';
+    search.value='';
+    gs.input.value='all';
+    sort.input.value='id';
+    draw();
+    search.focus();
+  },'quiet');
   const statusButtons=['all','help','watch','ok'].map(k=>h('button',{
-    class:'student-filter t-'+k,type:'button','data-tier':k,'aria-pressed':String(k===tier),
-    onclick:()=>{tier=k;draw();}
+    class:'student-filter t-'+k,type:'button','data-tier':k,'aria-pressed':String(k===filters.tier),
+    onclick:()=>{filters.tier=k;draw();}
   },h('span',null,t(k==='all'?'allStudents':'tier_'+k)),h('strong',null,totals[k])));
   const columns=['col_student','group','col_tier','col_risk','activity','viewProfile'];
   const cell=(k,child,cls)=>h('td',{class:cls,role:'cell'},h('span',{class:'student-cell-label','aria-hidden':'true'},t(k)),child);
   function draw(){
-    const query=search.value.trim().toLowerCase();
+    Object.assign(filters,{query:search.value,group:gs.input.value,sort:sort.input.value});
+    const query=filters.query.trim().toLowerCase();
     const rows=d.students.filter(r=>r.student_id.toLowerCase().includes(query)
-      &&(tier==='all'||r.tier===tier)&&(gs.input.value==='all'||r.group===gs.input.value))
-      .sort((a,b)=>(sort.input.value==='risk'?b.risk-a.risk:0)||a.student_id.localeCompare(b.student_id));
-    statusButtons.forEach(btn=>btn.setAttribute('aria-pressed',String(btn.dataset.tier===tier)));
+      &&(filters.tier==='all'||r.tier===filters.tier)&&(filters.group==='all'||r.group===filters.group))
+      .sort((a,b)=>(filters.sort==='risk'?b.risk-a.risk:0)||a.student_id.localeCompare(b.student_id));
+    statusButtons.forEach(btn=>btn.setAttribute('aria-pressed',String(btn.dataset.tier===filters.tier)));
+    clear.hidden=!filters.query&&filters.tier==='all'&&filters.group==='all'&&filters.sort==='id';
     count.textContent=t('shownStudents',{shown:rows.length,total:d.total});
     const body=rows.map(r=>{
       const fill=h('i');fill.style.width=r.risk+'%';
@@ -275,17 +295,21 @@ function studentsPage(d){
       class:'tbl student-directory-table',role:'table','aria-label':t('allStudents')},
       tableHead(columns.map(k=>t(k))),h('tbody',{role:'rowgroup'},body))):notice(t('no_matches')));
   }
-  const page=h('div',{class:'dashboard inner-page'},paneHeading(t('nav_students'),t('directoryIntro'),d.demo?demoPill():null),
-    h('div',{class:'student-filters',role:'group','aria-label':t('allStatuses')},statusButtons),
-    h('section',{class:'card student-directory'},h('div',{class:'student-toolbar'},
-      h('div',{class:'student-directory-search'},icon('search'),search),gs.wrap,sort.wrap),count,list));
+  const page=h('div',{class:'dashboard inner-page students-workspace'},paneHeading(t('nav_students'),t('directoryIntro'),d.demo?demoPill():null),
+    h('section',{class:'card student-directory'},
+      h('div',{class:'student-toolbar'},h('div',{class:'student-directory-search'},icon('search'),search),gs.wrap,sort.wrap),
+      h('div',{class:'student-filters',role:'group','aria-label':t('allStatuses')},statusButtons),
+      h('div',{class:'student-results-header'},count,clear),list));
   draw();return page;
 }
 function studentDetailPage(d){
   const r=d.student;
   const identity=h('strong',null,r.student_id);
   const reveal=linkButton(t('revealName'),()=>doRequest('/api/students/'+r.student_id+'/reveal',{method:'POST'},name=>{identity.textContent=r.student_id+' · '+(name.name||'—');reveal.textContent=t('hideName');reveal.onclick=()=>{identity.textContent=r.student_id;reveal.textContent=t('revealName');};},null),'quiet');
-  const cbtn=linkButton(d.contacted?t('unmarkContact'):t('markContact'),()=>doRequest('/api/students/'+r.student_id+'/contact',{method:'POST'},resp=>{cbtn.textContent=resp.contacted?t('unmarkContact'):t('markContact');},null));
+  const cbtn=linkButton(d.contacted?t('unmarkContact'):t('markContact'),()=>doRequest('/api/students/'+r.student_id+'/contact',{method:'POST'},resp=>{
+    cbtn.textContent=resp.contacted?t('unmarkContact'):t('markContact');
+    S.overviewCache=null;
+  },null));
   const textarea=h('textarea',{class:'field',rows:'3',maxlength:'1000',placeholder:t('note_ph')});
   const notes=h('div',{class:'stack notes-stack'});
   const drawNotes=arr=>notes.replaceChildren(...(arr.length?arr.map(n=>h('div',{class:'note'},h('strong',null,n.author),h('span',{class:'muted small'},n.created_at),h('p',null,n.body))):[h('p',{class:'muted'},t('noNotes'))]));
