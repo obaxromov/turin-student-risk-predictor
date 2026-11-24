@@ -11,7 +11,7 @@ import time
 
 SESSION_SECONDS = 8 * 3600
 MAX_ATTEMPTS = 5
-LOCK_SECONDS = 30
+LOCK_SECONDS = 30 * 60
 
 _lock = threading.Lock()
 _sessions: dict[str, dict] = {}

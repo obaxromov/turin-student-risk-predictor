@@ -143,6 +143,14 @@ function brandMark() {
 function icon(name) {
   const paths = {
     people: ["M16 18c-4.8 0-8 2.4-8 5v1h16v-1c0-2.6-3.2-5-8-5Z", "M16 14a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z"],
+    overview: ["M5 5h9v9H5z", "M18 5h9v9h-9z", "M5 18h9v9H5z", "M18 18h9v9h-9z"],
+    courses: ["M16 9c-3-3-8-4-12-3v19c4-1 9 0 12 3 3-3 8-4 12-3V6c-4-1-9 0-12 3v19"],
+    assignments: ["M10 6H7v22h18V6h-3", "M11 4h10v6H11z", "m11 19 3 3 7-7"],
+    students: ["M18 18a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z", "M9 27v-1c0-3.5 4-6 9-6s9 2.5 9 6v1", "M8 10a4 4 0 0 0 0 8", "M3 25c0-2 1.5-4 5-5"],
+    predict: ["M16 4l2.7 8.3L27 15l-8.3 2.7L16 26l-2.7-8.3L5 15l8.3-2.7L16 4Z", "M25 23v6", "M22 26h6"],
+    model: ["M5 6v21h23", "M11 22v-5", "M18 22V9", "M25 22V13"],
+    home: ["m3 14 13-10 13 10", "M7 12v15h6v-8h6v8h6V12"],
+    accounts: ["M5 7h22v18H5z", "M10 19c0-3 6-3 6 0", "M13 14h.01", "M20 13h3", "M20 19h3"],
     focus: ["M16 5a11 11 0 1 0 0 22 11 11 0 0 0 0-22Z", "M16 10v7", "M16 22h.01"],
     activity: ["M3 17h6l4-9 6 15 4-9h6"],
     arrow: ["M5 16h22", "m19 8 8 8-8 8"],
@@ -239,7 +247,7 @@ function shell(route, body) {
     h("div", { class: "menu-settings" }, h("span", { class: "muted small" }, t("language")), langSeg(),
       h("span", { class: "muted small" }, t("theme")), themeSeg()),
     h("button", { class: "btn block signout", type: "button", onclick: signOut }, t("sign_out")));
-  const toggle = h("button", { class: "account-toggle", type: "button", "aria-expanded": String(S.menuOpen), "aria-controls": "acct-menu",
+  const toggle = h("button", { class: "account-toggle", type: "button", "aria-label": t("profile") + ", " + u.username, "aria-expanded": String(S.menuOpen), "aria-controls": "acct-menu",
     onclick: () => { S.menuOpen = !S.menuOpen; menu.hidden = !S.menuOpen; toggle.setAttribute("aria-expanded", String(S.menuOpen)); } },
     h("span", { class: "avatar" }, u.username.slice(0, 1).toUpperCase()),
     h("span", { class: "account-name" }, u.username), icon("chevron"));
@@ -249,9 +257,10 @@ function shell(route, body) {
       if (main) { main.focus(); main.scrollIntoView(); }
     } }, t("jump_content")),
     h("header", { class: "topbar" }, h("div", { class: "topbar-in" },
-      h("div", { class: "brand" }, brandMark(), h("div", { class: "brand-text" }, h("strong", null, t("app_title")), h("span", null, t("insights")))),
-       h("nav", { class: "tabs tabs-" + u.role, "aria-label": t("mainNav") }, NAV[u.role].map(([k, key]) =>
-        h("a", { class: "tab", href: "#/" + k, "aria-current": route === k ? "page" : null }, t(key)))),
+      h("div", { class: "brand" }, brandMark(), h("strong", { class: "brand-text" }, t("app_title"))),
+      h("nav", { class: "tabs tabs-" + u.role, "aria-label": t("mainNav") }, NAV[u.role].map(([k, key]) =>
+        h("a", { class: "tab", href: "#/" + k, "aria-current": route === k ? "page" : null },
+          icon(k), h("span", null, t(key))))),
       h("div", { class: "acct" }, toggle, menu))),
     h("main", { id: "main-content", tabindex: "-1" }, body),
     h("footer", { class: "app-footer" }, h("div", null, t("privacy_note"))));
@@ -277,7 +286,7 @@ function priorityList(d, rows = d.urgent) {
         h("span", { class: "muted priority-reason" }, reasonText(r.reason))),
       h("span", { class: "priority-state" }, badge(r.tier),
         h("span", { class: "priority-score" }, r.risk + "%", h("small", { class: "muted" }, t("col_risk")))),
-      h("span", { class: "priority-arrow", "aria-hidden": "true" }, icon("arrow"))))));
+      h("span", { class: "priority-arrow", "aria-hidden": "true" }, icon("chevron"))))));
 }
 function urgentPanel(d) {
   const results = h("div", { class: "priority-results" }, priorityList(d));
@@ -344,8 +353,6 @@ function lineChart(d, lastFour = false) {
   for(const k of ['help','watch','ok']){
     const series=d.tier_series[k];if(!series)continue;
     const vals=series.slice(start),path=smoothPath(vals,W,H,p);
-    const glow=svg('path',{d:path,class:'smooth-glow s-'+k});
-    g.append(glow);
     const line=svg('path',{d:path,class:'ln s-'+k});
     line.append(svg('title',null,t('tier_'+k)+': '+vals.map(v=>v.toFixed(1)+'%').join(' · ')));
     g.append(line);
@@ -376,26 +383,18 @@ function cohortSummary(d) {
   return h("section", { class: "card overview-cohort" }, sectionHead(t("distribution")),
     bar, h("ul", { class: "cohort-status-list" }, tiers.map(tier => h("li", null,
       h("a", { class: "cohort-status-link", href: "#/students?status=" + tier },
-        badge(tier), h("strong", null, d.counts[tier]), icon("arrow"))))),
-    h("a", { class: "btn cohort-directory-link", href: "#/students?status=all" }, t("allStudents"), icon("arrow")));
+        badge(tier), h("strong", null, d.counts[tier]), icon("chevron"))))),
+    h("a", { class: "btn cohort-directory-link", href: "#/students?status=all" }, t("allStudents")));
 }
 function groupBars(d) {
   const W=600,H=220,p={l:34,r:12,t:18,b:30},n=Math.max(1,d.groups.length);
   const bw=Math.min(76,(W-p.l-p.r)/n*.54),y=v=>p.t+(1-v/100)*(H-p.t-p.b);
   const g=svg('svg',{class:'chart cohort-chart',viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':t('groups_title')});
-  const defs=svg('defs',null,
-    svg('linearGradient',{id:'cohort-glass-fill',x1:'0',x2:'0',y1:'0',y2:'1'},
-      svg('stop',{offset:'0%','stop-color':'#ff9da2'}),
-      svg('stop',{offset:'52%','stop-color':'#ed6574'}),
-      svg('stop',{offset:'100%','stop-color':'#bf415b'})));
-  g.append(defs);
   for(const v of [0,25,50,75,100])g.append(svg('line',{class:'grid-l',x1:p.l,x2:W-p.r,y1:y(v),y2:y(v)}),
     svg('text',{x:p.l-7,y:y(v)+4,'text-anchor':'end'},v));
   d.groups.forEach((r,i)=>{
     const cx=p.l+(i+.5)*(W-p.l-p.r)/n,top=y(r.flagged),height=Math.max(1,y(0)-top);
-    g.append(svg('rect',{class:'bar-aura',x:cx-bw/2-4,y:top-4,width:bw+8,height:height+5,rx:13}),
-      svg('rect',{class:'bar-glow',x:cx-bw/2,y:top,width:bw,height:height,rx:11}),
-      svg('rect',{class:'bar-f',x:cx-bw/2,y:top,width:bw,height:height,rx:11,fill:'url(#cohort-glass-fill)'}),
+    g.append(svg('rect',{class:'bar-f',x:cx-bw/2,y:top,width:bw,height:height,rx:7}),
       svg('text',{x:cx,y:top-11,'text-anchor':'middle',class:'value-label'},r.flagged+'%'),
       svg('text',{x:cx,y:H-8,'text-anchor':'middle'},r.group));
   });
@@ -414,7 +413,7 @@ function sectionHead(title, eyebrow, subtitle) {
 }
 function overviewView(d) {
   return h("div", { class: "dashboard teacher-overview" },
-    h("div", { class: "page-title overview-title" },
+    h("header", { class: "page-title overview-title" },
       h("div", null, h("h1", null, t("nav_overview")),
         h("p", { class: "muted" }, t("ov_sub", { w: d.weeks, n: d.students }))),
       d.demo ? demoPill() : null),
@@ -497,13 +496,6 @@ async function boot() {
     window.scrollTo(0,0);
     render();
   });
-  document.addEventListener('pointermove',ev=>{
-    const el=ev.target.closest('.btn,.account-toggle,.seg button,.course-tile,.liquid-trigger');
-    if(!el)return;
-    const r=el.getBoundingClientRect();
-    el.style.setProperty('--pointer-x',((ev.clientX-r.left)/r.width*100).toFixed(1)+'%');
-    el.style.setProperty('--pointer-y',((ev.clientY-r.top)/r.height*100).toFixed(1)+'%');
-  },{passive:true});
   document.addEventListener('click',ev=>{
     const m=document.getElementById('acct-menu');
     if(S.menuOpen&&m&&!ev.target.closest('.acct')){S.menuOpen=false;m.hidden=true;const b=document.querySelector('.account-toggle');if(b)b.setAttribute('aria-expanded','false');}

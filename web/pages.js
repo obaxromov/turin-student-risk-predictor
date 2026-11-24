@@ -202,7 +202,7 @@ function assignmentCount(n) {
 function auditAction(code) {return L['audit_'+code]?t('audit_'+code):String(code).replaceAll('_',' ');}
 
 function paneHeading(title, desc, end) {
-  return h('div',{class:'page-title'},h('div',null,h('p',{class:'eyebrow'},t('insights')),h('h1',null,title),desc?h('p',{class:'muted'},desc):null),end||null);
+  return h('header',{class:'page-title'},h('div',null,h('h1',null,title),desc?h('p',{class:'muted'},desc):null),end||null);
 }
 function notice(msg, ok=false) {return h('p',{class:'ui-notice '+(ok?'success':'') ,role:'status'},msg);}
 function requestError(e){
@@ -401,14 +401,14 @@ const PREDICTION_FIELDS=[
 
 function predictPage(d){
   const tools=[
-    ['predict/new','predictOne','predictOneInfo','enterStudentData','activity'],
-    ['predict/csv','predictBatch','predictBatchInfo','importCsv','people']
+    ['predict/new','predictOne','predictOneInfo','enterStudentData','predict'],
+    ['predict/csv','predictBatch','predictBatchInfo','importCsv','assignments']
   ];
   return h('div',{class:'dashboard inner-page prediction-workspace'},paneHeading(t('pr_title'),t('pr_sub'),d.demo?demoPill():null),
     h('div',{class:'prediction-columns'},tools.map(([route,title,desc,action,symbol])=>
       h('a',{class:'card prediction-option',href:'#/'+route},
         h('span',{class:'stat-icon'},icon(symbol)),h('h2',null,t(title)),h('p',{class:'muted'},t(desc)),
-        h('span',{class:'prediction-option-action'},t(action),icon('arrow'))))),
+        h('span',{class:'prediction-option-action'},t(action),icon('chevron'))))),
     h('p',{class:'muted small prediction-caveat'},modelCaveat(d)));
 }
 
